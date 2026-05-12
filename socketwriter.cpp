@@ -2,23 +2,31 @@
 /// @brief Socket client functions.
 
 #include <arpa/inet.h>
-#include <unistd.h>
-#include <sys/socket.h>
 #include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 #include <chrono>
 #include <cstring>
 #include <vector>
 
-#include "socketwriter.hpp"
 #include "helpers.hpp"
 #include "options.hpp"
+#include "socketwriter.hpp"
 #include "textsource.hpp"
 
 static void CloseSockets(std::vector<int>& sockets);
-static std::vector<int> OpenSockets(const std::string& addr, size_t port, size_t number);
-static void WriteLinesToSockets(std::vector<int>& sockets, const std::string& textfile, size_t num_lines, size_t delay_ms);
-static void WriteDurationToSockets(std::vector<int>& sockets, const std::string& textfile, size_t num_seconds, size_t delay_ms);
+static std::vector<int> OpenSockets(const std::string& addr,
+                                    size_t port,
+                                    size_t number);
+static void WriteLinesToSockets(std::vector<int>& sockets,
+                                const std::string& textfile,
+                                size_t num_lines,
+                                size_t delay_ms);
+static void WriteDurationToSockets(std::vector<int>& sockets,
+                                   const std::string& textfile,
+                                   size_t num_seconds,
+                                   size_t delay_ms);
 
 // Start a socket client.
 void SocketWriter(const Options& opts)
@@ -28,9 +36,11 @@ void SocketWriter(const Options& opts)
     try {
         sockets = OpenSockets(opts.ip_addr, opts.port, opts.number);
         if (opts.lines > 0) {
-            WriteLinesToSockets(sockets, opts.text_file, opts.lines, opts.delay_msec);
+            WriteLinesToSockets(sockets, opts.text_file, opts.lines,
+                                opts.delay_msec);
         } else {
-            WriteDurationToSockets(sockets, opts.text_file, opts.seconds, opts.delay_msec);
+            WriteDurationToSockets(sockets, opts.text_file, opts.seconds,
+                                   opts.delay_msec);
         }
         CloseSockets(sockets);
     } catch (const std::exception& e) {
@@ -62,7 +72,9 @@ static void CloseSockets(std::vector<int>& sockets)
 /// @param port Remote port
 /// @param num_sockets Number of connections to open to the remote host.
 /// @return A vector of open file descriptors.
-static std::vector<int> OpenSockets(const std::string& addr, size_t port, size_t num_sockets)
+static std::vector<int> OpenSockets(const std::string& addr,
+                                    size_t port,
+                                    size_t num_sockets)
 {
     std::vector<int> sockets;
     sockets.reserve(num_sockets);
@@ -73,28 +85,27 @@ static std::vector<int> OpenSockets(const std::string& addr, size_t port, size_t
             throw std::runtime_error("socket: " + std::string(strerror(errno)));
         }
 
-        struct sockaddr_in serv_addr = {
-            .sin_family = AF_INET,
-            .sin_port = htons(port),
-            .sin_addr = {
-                .s_addr = INADDR_ANY
-            },
-            .sin_zero = 0
-        };
+        struct sockaddr_in serv_addr = {.sin_family = AF_INET,
+                                        .sin_port = htons(port),
+                                        .sin_addr = {.s_addr = INADDR_ANY},
+                                        .sin_zero = 0};
 
         int e = inet_pton(AF_INET, addr.c_str(), &(serv_addr.sin_addr));
         if (e == -1) {
             close(fd);
-            throw std::runtime_error("inet_pton( " + addr + " ): " + std::string(strerror(errno)));
+            throw std::runtime_error("inet_pton( " + addr +
+                                     " ): " + std::string(strerror(errno)));
         } else if (e == 0) {
             close(fd);
-            throw std::invalid_argument(addr + " is not a valid network address");
+            throw std::invalid_argument(addr +
+                                        " is not a valid network address");
         }
 
         e = connect(fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
         if (e == -1) {
             close(fd);
-            throw std::runtime_error("connect: port(" + std::to_string(port) + " ): " + std::string(strerror(errno)));
+            throw std::runtime_error("connect: port(" + std::to_string(port) +
+                                     " ): " + std::string(strerror(errno)));
         }
 
         sockets.push_back(fd);
@@ -104,7 +115,10 @@ static std::vector<int> OpenSockets(const std::string& addr, size_t port, size_t
     return sockets;
 }
 
-static void WriteDurationToSockets(std::vector<int>& sockets, const std::string& textfile, size_t num_seconds, size_t delay_ms)
+static void WriteDurationToSockets(std::vector<int>& sockets,
+                                   const std::string& textfile,
+                                   size_t num_seconds,
+                                   size_t delay_ms)
 {
     if (sockets.empty()) {
         throw std::runtime_error("No sockets!");
@@ -118,7 +132,8 @@ static void WriteDurationToSockets(std::vector<int>& sockets, const std::string&
     size_t total_bytes = 0;
     size_t total_lines = 0;
     size_t open_sockets = sockets.size();
-    Msg("Writing to sockets every %zd ms for %zu seconds", delay_ms, num_seconds);
+    Msg("Writing to sockets every %zd ms for %zu seconds", delay_ms,
+        num_seconds);
     while (std::chrono::steady_clock::now() < stop_time) {
         int idx = 0;
         int fd = -1;
@@ -158,13 +173,19 @@ static void WriteDurationToSockets(std::vector<int>& sockets, const std::string&
         Pause(delay_ms);
     }
 
-    const auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_time).count();
+    const auto duration_ms =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - start_time)
+                    .count();
     PrintSummary(total_bytes, total_lines, duration_ms);
 
     Msg("Done writing");
 }
 
-static void WriteLinesToSockets(std::vector<int>& sockets, const std::string& textfile, size_t num_lines, size_t delay_ms)
+static void WriteLinesToSockets(std::vector<int>& sockets,
+                                const std::string& textfile,
+                                size_t num_lines,
+                                size_t delay_ms)
 {
     if (sockets.empty()) {
         throw std::runtime_error("No sockets!");
@@ -218,7 +239,10 @@ static void WriteLinesToSockets(std::vector<int>& sockets, const std::string& te
     }
 
     const auto stop_time = std::chrono::steady_clock::now();
-    const auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(stop_time - start_time).count();
+    const auto duration_ms =
+            std::chrono::duration_cast<std::chrono::milliseconds>(stop_time -
+                                                                  start_time)
+                    .count();
     PrintSummary(total_bytes, total_lines, duration_ms);
 
     Msg("Done writing");

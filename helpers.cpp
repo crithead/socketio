@@ -100,11 +100,16 @@ void PrintSummary(size_t bytes, size_t lines, size_t milliseconds)
     }
 
     if (minutes > 0) {
-        std::cout << "Processed " << bytes << " bytes in " << lines << " lines for " << minutes << "m " << seconds << "s " << milliseconds << "ms" << std::endl;
+        std::cout << "Processed " << bytes << " bytes in " << lines
+                  << " lines for " << minutes << "m " << seconds << "s "
+                  << milliseconds << "ms" << std::endl;
     } else if (seconds > 0) {
-        std::cout << "Processed " << bytes << " bytes in " << lines << " lines for " << seconds << "s " << milliseconds << "ms" << std::endl;
+        std::cout << "Processed " << bytes << " bytes in " << lines
+                  << " lines for " << seconds << "s " << milliseconds << "ms"
+                  << std::endl;
     } else {
-        std::cout << "Processed " << bytes << " bytes in " << lines << " lines for " << milliseconds << "ms" << std::endl;
+        std::cout << "Processed " << bytes << " bytes in " << lines
+                  << " lines for " << milliseconds << "ms" << std::endl;
     }
 }
 

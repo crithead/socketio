@@ -4,10 +4,7 @@
 
 #include "textsource.hpp"
 
-TextSource::TextSource(const std::string& filename) :
-    input(filename)
-{
-}
+TextSource::TextSource(const std::string& filename) : input(filename) {}
 
 TextSource::~TextSource()
 {

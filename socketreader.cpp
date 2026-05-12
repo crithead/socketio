@@ -1,30 +1,30 @@
 /// @file socket.cpp
 /// @brief Socket server implementation.
 
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/select.h>
-#include <sys/poll.h>
-#include <sys/epoll.h>
 #include <fcntl.h>
+#include <netinet/in.h>
+#include <sys/epoll.h>
+#include <sys/poll.h>
+#include <sys/select.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <chrono>
-#include <stdexcept>
 #include <cstring>
 #include <iostream>
 #include <memory>
+#include <stdexcept>
 #include <vector>
 
 #include "helpers.hpp"
 #include "options.hpp"
 #include "socketreader.hpp"
 
-class no_data_exception : public std::exception {
-public:
-    const char* what() const noexcept override {
-        return "No data available";
-    }
+class no_data_exception : public std::exception
+{
+   public:
+    const char *what() const noexcept override { return "No data available"; }
 };
 
 /// Receive buffer length.
@@ -39,18 +39,18 @@ static void SocketServerSelect(const Options&);
 void SocketReader(const Options& opts)
 {
     switch (ParseWaitMethod(opts.wait_method)) {
-        case WaitMethod::Select:
-            SocketServerSelect(opts);
-            break;
-        case WaitMethod::Poll:
-            SocketServerPoll(opts);
-            break;
-        case WaitMethod::Epoll:
-            SocketServerEpoll(opts);
-            break;
-        default:
-            throw std::invalid_argument("wait-method");
-            break;
+    case WaitMethod::Select:
+        SocketServerSelect(opts);
+        break;
+    case WaitMethod::Poll:
+        SocketServerPoll(opts);
+        break;
+    case WaitMethod::Epoll:
+        SocketServerEpoll(opts);
+        break;
+    default:
+        throw std::invalid_argument("wait-method");
+        break;
     }
 }
 
@@ -62,7 +62,9 @@ void SocketReader(const Options& opts)
 /// @param epoll_fd The epoll file descriptor.
 /// @param reader_fd The reader file descriptor.
 /// @param connections The list of connections.
-static void AcceptNewConnection(int epoll_fd, int reader_fd, std::vector<int>& connections)
+static void AcceptNewConnection(int epoll_fd,
+                                int reader_fd,
+                                std::vector<int>& connections)
 {
     struct sockaddr_in client_addr;
     socklen_t client_len = sizeof(client_addr);
@@ -76,12 +78,8 @@ static void AcceptNewConnection(int epoll_fd, int reader_fd, std::vector<int>& c
 
     SetNonBlocking(fd);
 
-    struct epoll_event ev = {
-        .events = EPOLLIN | EPOLLHUP | EPOLLERR,
-        .data = {
-            .fd = fd
-        }
-     };
+    struct epoll_event ev = {.events = EPOLLIN | EPOLLHUP | EPOLLERR,
+                             .data = {.fd = fd}};
     int err = epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &ev);
     if (err == -1) {
         Err("epoll_ctl: %s", strerror(errno));
@@ -92,23 +90,26 @@ static void AcceptNewConnection(int epoll_fd, int reader_fd, std::vector<int>& c
     connections.push_back(fd);
 }
 
-/// @brief Close a connection and remove it from the epoll set and connections list.
-/// It is not necessary to remove the file descriptor from the epoll set before
-/// closing it since close will do it in this simple case.
+/// @brief Close a connection and remove it from the epoll set and connections
+/// list. It is not necessary to remove the file descriptor from the epoll set
+/// before closing it since close will do it in this simple case.
 /// @param epoll_fd The epoll file descriptor.
 /// @param fd The file descriptor of interest.
 /// @param connections Connections list
 static void CloseConnection(int epoll_fd, int fd, std::vector<int>& connections)
 {
     Msg("Close connection (%d)", fd);
-    epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, nullptr);    // not necessary
+    epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, nullptr);  // not necessary
     close(fd);
-    for (auto it = connections.begin(); it != connections.end(); ++it) {
-        if (*it == fd) {
-            connections.erase(it);
-            break;
-        }
-    }
+    auto it = std::find_if(connections.begin(), connections.end(),
+                           [fd] (int value) { return value == fd; });
+    connections.erase(it);
+    //for (auto it = connections.begin(); it != connections.end(); ++it) {
+    //    if (*it == fd) {
+    //        connections.erase(it);
+    //        break;
+    //    }
+    //}
 }
 
 /// @brief Open a non-blocking listener socket.
@@ -116,7 +117,8 @@ static void CloseConnection(int epoll_fd, int fd, std::vector<int>& connections)
 /// - Bind to port
 /// - Listen
 /// @param port The port number to listen on.
-/// @param backlog The maximum number of pending connections in the listen queue.
+/// @param backlog The maximum number of pending connections in the listen
+/// queue.
 /// @return The file descriptor of the listener socket.
 static int OpenListenerSocket(size_t port, size_t backlog)
 {
@@ -127,12 +129,10 @@ static int OpenListenerSocket(size_t port, size_t backlog)
     }
 
     struct sockaddr_in sa = {
-        .sin_family = AF_INET,
-        .sin_port = htons(port),
-        .sin_addr = {
-            .s_addr = htonl(INADDR_ANY)
-        },
-        .sin_zero = 0,
+            .sin_family = AF_INET,
+            .sin_port = htons(port),
+            .sin_addr = {.s_addr = htonl(INADDR_ANY)},
+            .sin_zero = 0,
     };
 
     Msg("Bind");
@@ -153,7 +153,6 @@ static int OpenListenerSocket(size_t port, size_t backlog)
     return reader_fd;
 }
 
-
 /// @brief Read from a connection and print the data to the console.
 /// @param fd The file descriptor of interest.
 /// @return The number of bytes read.
@@ -171,7 +170,7 @@ static size_t ReadFromConnection(int fd)
         }
     } else if (n > 0) {
         // TODO Add flag to enable printing received data
-        //std::cout << '[' << fd << "] " << std::string(rxbuf, n) << std::endl;
+        // std::cout << '[' << fd << "] " << std::string(rxbuf, n) << std::endl;
         value = static_cast<size_t>(n);
     } else {
         throw no_data_exception();
@@ -187,11 +186,13 @@ static void SetNonBlocking(int fd)
     Msg("Set non-blocking (%d)", fd);
     int flags = fcntl(fd, F_GETFL, 0);
     if (flags == -1) {
-        throw std::runtime_error("fcntl F_GETFL: " + std::string(strerror(errno)));
+        throw std::runtime_error("fcntl F_GETFL: " +
+                                 std::string(strerror(errno)));
     }
     flags |= O_NONBLOCK;
     if (fcntl(fd, F_SETFL, flags) == -1) {
-        throw std::runtime_error("fcntl F_SETFL: " + std::string(strerror(errno)));
+        throw std::runtime_error("fcntl F_SETFL: " +
+                                 std::string(strerror(errno)));
     }
 }
 
@@ -201,7 +202,7 @@ static void SocketServerEpoll(const Options& opts)
 {
     Msg("%s", __func__);
 
-    static constexpr int TIMEOUT_MS = 100;   // 0.1 seconds
+    static constexpr int TIMEOUT_MS = 100;  // 0.1 seconds
     static constexpr int MAX_EVENTS = 16;
 
     int reader_fd = OpenListenerSocket(opts.port, opts.number);
@@ -209,7 +210,8 @@ static void SocketServerEpoll(const Options& opts)
     Msg("Initialize epoll set");
     int epoll_fd = epoll_create1(0);
     if (epoll_fd == -1) {
-        throw std::runtime_error("epoll_create1: " + std::string(strerror(errno)));
+        throw std::runtime_error("epoll_create1: " +
+                                 std::string(strerror(errno)));
     }
 
     // Add listener socket to epoll set.
@@ -217,12 +219,8 @@ static void SocketServerEpoll(const Options& opts)
     connections.reserve(opts.number);
     connections.push_back(reader_fd);
 
-    struct epoll_event ev = {
-        .events = EPOLLIN | EPOLLHUP | EPOLLERR,
-        .data = {
-            .fd = reader_fd
-        }
-     };
+    struct epoll_event ev = {.events = EPOLLIN | EPOLLHUP | EPOLLERR,
+                             .data = {.fd = reader_fd}};
     int err = epoll_ctl(epoll_fd, EPOLL_CTL_ADD, reader_fd, &ev);
     if (err == -1) {
         close(reader_fd);
@@ -244,9 +242,9 @@ static void SocketServerEpoll(const Options& opts)
         if (n == -1) {
             Err("epoll_wait: %s", strerror(errno));
             if (errno == EINTR) {
-                continue;   // interrupted by signal, do over
+                continue;  // interrupted by signal, do over
             } else {
-                break;      // unrecoverable error, give up
+                break;  // unrecoverable error, give up
             }
         } else if (n > 0) {
             for (int i = 0; i < n; ++i) {
@@ -255,8 +253,7 @@ static void SocketServerEpoll(const Options& opts)
                 } else if ((events[i].events & EPOLLHUP) != 0) {
                     Err("HUP (%d)", events[i].data.fd);
                     CloseConnection(epoll_fd, events[i].data.fd, connections);
-                }
-                else if ((events[i].events & EPOLLERR) != 0) {
+                } else if ((events[i].events & EPOLLERR) != 0) {
                     Err("Error (%d)", events[i].data.fd);
                     CloseConnection(epoll_fd, events[i].data.fd, connections);
                 } else {
@@ -264,22 +261,26 @@ static void SocketServerEpoll(const Options& opts)
                         total_lines++;
                         total_bytes += ReadFromConnection(events[i].data.fd);
                     } catch (const no_data_exception&) {
-                        CloseConnection(epoll_fd, events[i].data.fd, connections);
+                        CloseConnection(epoll_fd, events[i].data.fd,
+                                        connections);
                     } catch (const std::runtime_error& e) {
                         Err("Error (%d): %s", events[i].data.fd, e.what());
-                        CloseConnection(epoll_fd, events[i].data.fd, connections);
+                        CloseConnection(epoll_fd, events[i].data.fd,
+                                        connections);
                     }
                 }
             }
-        } // else n == 0 -> timed out
+        }  // else n == 0 -> timed out
     }
 
-    auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_time).count();
+    auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                               std::chrono::steady_clock::now() - start_time)
+                               .count();
     PrintSummary(total_bytes, total_lines, duration_ms);
 
     for (int fd : connections) {
         Msg("Close connection (%d)", fd);
-        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, nullptr);    // not necessary
+        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, nullptr);  // not necessary
         close(fd);
     }
     close(epoll_fd);
@@ -291,8 +292,10 @@ static void SocketServerPoll(const Options& opts)
 {
     Msg("%s", __func__);
 
-    static constexpr int TIMEOUT_MS = 100;   // 0.1 seconds
-    const size_t MAX_CONNS = opts.number > 0 ? static_cast<size_t>(opts.number) : std::numeric_limits<size_t>::max();
+    static constexpr int TIMEOUT_MS = 100;  // 0.1 seconds
+    const size_t MAX_CONNS = opts.number > 0
+                                     ? static_cast<size_t>(opts.number)
+                                     : std::numeric_limits<size_t>::max();
 
     int reader_fd = OpenListenerSocket(opts.port, opts.number);
 
@@ -300,17 +303,18 @@ static void SocketServerPoll(const Options& opts)
     auto start_time = std::chrono::steady_clock::now();
     auto stop_time = start_time + std::chrono::seconds(opts.seconds);
 
-    auto connections = std::unique_ptr<struct pollfd[]>(new struct pollfd[opts.number]);
+    auto connections =
+            std::unique_ptr<struct pollfd[]>(new struct pollfd[opts.number]);
     size_t num_conns = 0;
     size_t total_bytes = 0;
 
     connections[num_conns++] = {reader_fd, POLLIN, 0};
 
     while (std::chrono::steady_clock::now() < stop_time) {
-        int n = poll(connections.get(), num_conns, TIMEOUT_MS);
-        if (n == -1) {
+        int e = poll(connections.get(), num_conns, TIMEOUT_MS);
+        if (e == -1) {
             Err("poll: %s", strerror(errno));
-        } else if (n > 0) {
+        } else if (e > 0) {
             for (size_t i = 0; i < num_conns; ++i) {
                 if ((connections[i].revents & POLLHUP) != 0) {
                     Err("HUP (%d)", connections[i].fd);
@@ -319,24 +323,22 @@ static void SocketServerPoll(const Options& opts)
                     connections[i] = connections[num_conns - 1];
                     num_conns--;
                     i--;
-                }
-                else if ((connections[i].revents & POLLNVAL) != 0) {
+                } else if ((connections[i].revents & POLLNVAL) != 0) {
                     Err("Invalid (%d)", connections[i].fd);
                     connections[i].fd = -1;
                     connections[i] = connections[num_conns - 1];
                     num_conns--;
                     i--;
-                }
-                else if ((connections[i].revents & POLLERR) != 0) {
-                    Err("Error (%d, %04X)", connections[i].fd, connections[i].revents);
+                } else if ((connections[i].revents & POLLERR) != 0) {
+                    Err("Error (%d, %04X)", connections[i].fd,
+                        connections[i].revents);
                     close(connections[i].fd);
                     connections[i].fd = -1;
                     connections[i].events = 0;
                     // connections[i] = connections[num_conns - 1];
                     // num_conns--;
                     // i--;
-                }
-                else if ((connections[i].revents & POLLIN) != 0) {
+                } else if ((connections[i].revents & POLLIN) != 0) {
                     if (connections[i].fd == reader_fd) {
                         // Accept new connection
                         // TODO Grow the connections array as needed.
@@ -346,7 +348,9 @@ static void SocketServerPoll(const Options& opts)
                             struct sockaddr_in remote_addr;
                             memset(&remote_addr, 0, sizeof(remote_addr));
                             socklen_t remote_len = sizeof(remote_addr);
-                            int remote_fd = accept(reader_fd, (struct sockaddr *)&remote_addr, &remote_len);
+                            int remote_fd = accept(
+                                    reader_fd, (struct sockaddr *)&remote_addr,
+                                    &remote_len);
                             if (remote_fd != -1) {
                                 close(remote_fd);
                             }
@@ -355,7 +359,9 @@ static void SocketServerPoll(const Options& opts)
                             struct sockaddr_in remote_addr;
                             memset(&remote_addr, 0, sizeof(remote_addr));
                             socklen_t remote_len = sizeof(remote_addr);
-                            int remote_fd = accept(reader_fd, (struct sockaddr *)&remote_addr, &remote_len);
+                            int remote_fd = accept(
+                                    reader_fd, (struct sockaddr *)&remote_addr,
+                                    &remote_len);
                             if (remote_fd == -1) {
                                 Err("accept: %s", strerror(errno));
                             } else {
@@ -371,13 +377,14 @@ static void SocketServerPoll(const Options& opts)
                         ssize_t n = recv(connections[i].fd, rxbuf, RXBUFLEN, 0);
                         if (n == -1) {
                             if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                                continue;   // skip this one
+                                continue;  // skip this one
                             } else {
                                 Err("recv: %s", strerror(errno));
                             }
                         } else if (n > 0) {
                             total_bytes += n;
-                            std::cout << '[' << connections[i].fd << "] " << std::string(rxbuf, n) << std::endl;
+                            std::cout << '[' << connections[i].fd << "] "
+                                      << std::string(rxbuf, n) << std::endl;
                         } else {
                             // Is this case handled above by POLLHUP?
                             Msg("Connection closed (%d)", connections[i].fd);
@@ -390,7 +397,7 @@ static void SocketServerPoll(const Options& opts)
                     }
                 }
             }
-        } // else n == 0 -> timed out
+        }  // else e == 0 -> timed out
     }
 
     Msg("Read %zu bytes", total_bytes);
@@ -427,8 +434,8 @@ static void SocketServerSelect(const Options& opts)
         fd_set exceptfds;
         FD_ZERO(&exceptfds);
         struct timeval timeout = {
-            .tv_sec = 0,
-            .tv_usec = 100000   // 0.1 seconds
+                .tv_sec = 0,
+                .tv_usec = 100000  // 0.1 seconds
         };
 
         // Set management could be smarter by keeping an active fd_set and a
@@ -449,10 +456,10 @@ static void SocketServerSelect(const Options& opts)
             }
         }
 
-        int n = select(maxfd + 1, &readfds, nullptr, &exceptfds, &timeout);
-        if (n == -1) {
+        int e = select(maxfd + 1, &readfds, nullptr, &exceptfds, &timeout);
+        if (e == -1) {
             Err("select: %s", strerror(errno));
-        } else if (n > 0) {
+        } else if (e > 0) {
             for (size_t i = 0; i < connections.size(); ++i) {
                 int fd = connections[i];
                 if (fd < 0 || fd >= FD_SETSIZE) {
@@ -462,7 +469,7 @@ static void SocketServerSelect(const Options& opts)
                     Err("Exception (%d)", fd);
                     close(fd);
                     connections[i] = -1;
-                    //connections.erase(connections.begin() + i);
+                    // connections.erase(connections.begin() + i);
                     //--i;
                     continue;
                 }
@@ -472,7 +479,9 @@ static void SocketServerSelect(const Options& opts)
                         struct sockaddr_in remote_addr;
                         memset(&remote_addr, 0, sizeof(remote_addr));
                         socklen_t remote_len = sizeof(remote_addr);
-                        int remote_fd = accept(reader_fd, (struct sockaddr *)&remote_addr, &remote_len);
+                        int remote_fd = accept(reader_fd,
+                                               (struct sockaddr *)&remote_addr,
+                                               &remote_len);
                         if (remote_fd == -1) {
                             Err("accept: %s", strerror(errno));
                         } else {
@@ -486,13 +495,14 @@ static void SocketServerSelect(const Options& opts)
                         ssize_t n = recv(fd, rxbuf, RXBUFLEN, 0);
                         if (n == -1) {
                             if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                                continue;   // skip this one
+                                continue;  // skip this one
                             } else {
                                 Err("recv: %s", strerror(errno));
                             }
                         } else if (n > 0) {
                             total_bytes += n;
-                            std::cout << '[' << fd << "] " << std::string(rxbuf, n) << std::endl;
+                            std::cout << '[' << fd << "] "
+                                      << std::string(rxbuf, n) << std::endl;
                         } else {
                             Msg("Connection closed (%d)", fd);
                             close(fd);
@@ -500,7 +510,7 @@ static void SocketServerSelect(const Options& opts)
                         }
                     }
                 }
-            } // else n == 0 -> timed out
+            }  // else e == 0 -> timed out
         }
         // TODO Move connections array clean up to here
         // TODO (remove closed connections)

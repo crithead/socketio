@@ -6,17 +6,11 @@
 
 #include <string>
 
-enum WaitMethod
-{
-    None,
-    Select,
-    Poll,
-    Epoll
-};
+enum WaitMethod { None, Select, Poll, Epoll };
 
 class Options
 {
-    public:
+   public:
     static const size_t DEFAULT_NUMBER;
     static const size_t MIN_NUMBER;
     static const size_t MAX_NUMBER;
@@ -36,7 +30,7 @@ class Options
     static const std::string DEFAULT_TEXT_FILE;
     static const std::string DEFAULT_WAIT_METHOD;
 
-    Options(int argc, char* argv[]);
+    Options(int argc, char *argv[]);
 
     bool print_usage;
     bool verbose;
@@ -54,4 +48,3 @@ class Options
 /// @param method The wait method string to parse.
 /// @return The corresponding WaitMethod enumeration value.
 WaitMethod ParseWaitMethod(const std::string& method);
-

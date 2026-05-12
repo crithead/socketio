@@ -1,6 +1,8 @@
 /// @file helpers.hpp
 /// @brief Common functions used by both reader and writer.
 
+#include <string>
+
 /// @brief Adjust resource limits for this process.
 /// * Set nofile (file descriptor) soft limit to hard limit.
 /// @throws std::runtime_error

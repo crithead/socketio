@@ -1,16 +1,15 @@
 /// A Source of text.
 
-#include <string>
 #include <fstream>
+#include <string>
 
 /// @brief  A source of text.
 class TextSource
 {
-    public:
-
+   public:
     /// @brief  Construct a TextSource object from the specified file.
     /// @param filename A file containing text.
-    TextSource(const std::string& filename);
+    explicit TextSource(const std::string& filename);
 
     /// @brief  Destructor.
     ~TextSource();
@@ -23,6 +22,6 @@ class TextSource
     /// @return A string of text.
     std::string GetText(size_t length = 0);
 
-    private:
+   private:
     std::ifstream input;
 };
